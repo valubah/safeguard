@@ -1,19 +1,108 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Shield, Phone, MapPin, Users, Settings, Bell, Camera, Mic, AlertTriangle, Send, Plus, X, Check, Clock, Battery, Play, Pause, Square, Download, Share2, Eye, EyeOff, Zap, Brain, Navigation } from 'lucide-react';
 
+
+const persistentStorage = {
+  data: {},
+  
+  getItem: function(key) {
+    return this.data[key] || null;
+  },
+  
+  setItem: function(key, value) {
+    this.data[key] = value;
+  },
+  
+  removeItem: function(key) {
+    delete this.data[key];
+  }
+};
+
+
+
+// Initialize with default data if not exists
+const initializeStorage = () => {
+  if (!persistentStorage.getItem('safeguard_initialized')) {
+    persistentStorage.setItem('safeguard_contacts', JSON.stringify([
+      { id: 1, name: 'Mom', phone: '+1234567890', relation: 'Parent', verified: true },
+      { id: 2, name: 'Dad', phone: '+1234567891', relation: 'Parent', verified: true },
+      { id: 3, name: 'Police', phone: '911', relation: 'Emergency', verified: true }
+    ]));
+    persistentStorage.setItem('safeguard_recordings', JSON.stringify([]));
+    persistentStorage.setItem('safeguard_location_history', JSON.stringify([]));
+    persistentStorage.setItem('safeguard_settings', JSON.stringify({
+      autoStartTracking: false,
+      silentMode: true,
+      backgroundLocation: true,
+      aiMonitoring: true,
+      autoRecord: true,
+      emergencyTimeout: 10
+    }));
+    persistentStorage.setItem('safeguard_initialized', 'true');
+  }
+};
+
+
+
 const SafeGuardApp = () => {
+
+  React.useEffect(() => {
+    initializeStorage();
+  }, []);
+
+
+
   const [activeTab, setActiveTab] = useState('home');
-  const [emergencyContacts, setEmergencyContacts] = useState([
-    { id: 1, name: 'Mom', phone: '+1234567890', relation: 'Parent', verified: true },
-    { id: 2, name: 'Dad', phone: '+1234567891', relation: 'Parent', verified: true },
-    { id: 3, name: 'Police', phone: '911', relation: 'Emergency', verified: true }
-  ]);
+  
+  const [emergencyContacts, setEmergencyContacts] = useState(() => {
+    const saved = persistentStorage.getItem('safeguard_contacts');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, name: 'Mom', phone: '+1234567890', relation: 'Parent', verified: true },
+      { id: 2, name: 'Dad', phone: '+1234567891', relation: 'Parent', verified: true },
+      { id: 3, name: 'Police', phone: '911', relation: 'Emergency', verified: true }
+    ];
+  });
+
+
+  const [locationHistory, setLocationHistory] = useState(() => {
+    const saved = persistentStorage.getItem('safeguard_location_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [recordings, setRecordings] = useState(() => {
+    const saved = persistentStorage.getItem('safeguard_recordings');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [settings, setSettings] = useState(() => {
+    const saved = persistentStorage.getItem('safeguard_settings');
+    return saved ? JSON.parse(saved) : {
+      autoStartTracking: true,
+      silentMode: true,
+      backgroundLocation: true,
+      aiMonitoring: true,
+      autoRecord: true,
+      emergencyTimeout: 10
+    };
+  });
+
+
+
+
+
+
+
+
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0, accuracy: 0, timestamp: null });
-  const [locationHistory, setLocationHistory] = useState([]);
+
+
+  
   const [isTracking, setIsTracking] = useState(false);
   const [panicMode, setPanicMode] = useState(false);
   const [safetyTimer, setSafetyTimer] = useState({ active: false, duration: 30, remaining: 30 });
-  const [recordings, setRecordings] = useState([]);
+  
+
+
   const [isRecording, setIsRecording] = useState(false);
   const [recordingType, setRecordingType] = useState(null);
   const [mediaStream, setMediaStream] = useState(null);
@@ -21,16 +110,33 @@ const SafeGuardApp = () => {
   const [batteryLevel, setBatteryLevel] = useState(100);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [aiAnalysis, setAiAnalysis] = useState({ threat: 'low', confidence: 0, suggestions: [] });
-  const [settings, setSettings] = useState({
-    autoStartTracking: false,
-    silentMode: true,
-    backgroundLocation: true,
-    aiMonitoring: true,
-    autoRecord: true,
-    emergencyTimeout: 10
-  });
+ 
   const [newContact, setNewContact] = useState({ name: '', phone: '', relation: '' });
   const [showAddContact, setShowAddContact] = useState(false);
+
+
+  useEffect(() => {
+    persistentStorage.setItem('safeguard_contacts', JSON.stringify(emergencyContacts));
+  }, [emergencyContacts]);
+
+  // Persist location history
+  useEffect(() => {
+    persistentStorage.setItem('safeguard_location_history', JSON.stringify(locationHistory));
+  }, [locationHistory]);
+
+  // Persist recordings
+  useEffect(() => {
+    persistentStorage.setItem('safeguard_recordings', JSON.stringify(recordings));
+  }, [recordings]);
+
+  // Persist settings
+  useEffect(() => {
+    persistentStorage.setItem('safeguard_settings', JSON.stringify(settings));
+  }, [settings]);
+
+
+
+  
 
   const watchIdRef = useRef(null);
   const timerRef = useRef(null);
@@ -38,6 +144,9 @@ const SafeGuardApp = () => {
   const chunksRef = useRef([]);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+
+  
 
   // Initialize geolocation and device features
   useEffect(() => {
