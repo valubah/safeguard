@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Shield, Phone, MapPin, Users, Settings, Bell, Camera, Mic, AlertTriangle, Send, Plus, X, Check, Clock, Battery, Play, Pause, Square, Download, Share2, Eye, EyeOff, Zap, Brain, Navigation } from 'lucide-react';
-import React, { useState, useCallback } from 'react';
-import { Check, Clock, Phone, X, Plus, CheckCircle } from 'lucide-react';
+import { Shield, Phone, MapPin, Users, Settings, Bell, Camera, Mic, AlertTriangle, Send, Plus, X, Check, Clock, Battery, Play, Pause, Square, Download, Share2, Eye, EyeOff, Zap, Brain, Navigation, CheckCircle } from 'lucide-react';
 
 
 
@@ -134,18 +132,7 @@ const SafeGuardApp = () => {
   const [showAddContact, setShowAddContact] = useState(false);
 
 
-  const verifyContact = useCallback((contactId) => {
-    setEmergencyContacts(prev => prev.map(contact => 
-      contact.id === contactId 
-        ? { 
-            ...contact, 
-            verified: true, 
-            verifiedAt: new Date().toISOString() 
-          }
-        : contact
-    ));
-  }, []);
-
+  
 
 
   useEffect(() => {
@@ -575,159 +562,26 @@ const SafeGuardApp = () => {
 
 
 
+  // STEP 2: ADD THIS NEW FUNCTION
+const verifyContact = useCallback((contactId) => {
+  setEmergencyContacts(prev => prev.map(contact => 
+    contact.id === contactId 
+      ? { 
+          ...contact, 
+          verified: true, 
+          verifiedAt: new Date().toISOString() 
+        }
+      : contact
+  ));
+}, []);
+
+
+
+
+
   const removeContact = useCallback((id) => {
     setEmergencyContacts(prev => prev.filter(contact => contact.id !== id));
   }, []);
-
-  return (
-    <div className="max-w-md mx-auto bg-white min-h-screen p-4">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-semibold">Emergency Contacts</h3>
-          <button 
-            onClick={() => setShowAddContact(true)}
-            className="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-        
-        {/* Add Contact Modal */}
-        {showAddContact && (
-          <div className="bg-white border-2 border-red-200 rounded-xl p-4 shadow-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="font-semibold">Add Emergency Contact</h4>
-              <button 
-                onClick={() => setShowAddContact(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={newContact.name}
-                onChange={(e) => setNewContact(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
-              <input
-                type="tel"
-                placeholder="Phone Number (with country code)"
-                value={newContact.phone}
-                onChange={(e) => setNewContact(prev => ({ ...prev, phone: e.target.value }))}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
-              <select
-                value={newContact.relation}
-                onChange={(e) => setNewContact(prev => ({ ...prev, relation: e.target.value }))}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="">Select Relationship</option>
-                <option value="Parent">Parent</option>
-                <option value="Partner">Partner</option>
-                <option value="Sibling">Sibling</option>
-                <option value="Friend">Friend</option>
-                <option value="Emergency">Emergency Service</option>
-                <option value="Other">Other</option>
-              </select>
-              <button
-                onClick={addEmergencyContact}
-                className="w-full bg-red-500 text-white p-3 rounded-lg hover:bg-red-600 transition-colors"
-                disabled={!newContact.name || !newContact.phone || !newContact.relation}
-              >
-                Add Contact
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {/* 2. UPDATED: Enhanced contacts list with verification functionality */}
-        <div className="space-y-3">
-          {emergencyContacts.map(contact => (
-            <div key={contact.id} className="bg-white border rounded-xl p-4 shadow-sm">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold">{contact.name}</span>
-                    {contact.verified ? (
-                      <Check size={16} className="text-green-500" />
-                    ) : (
-                      <Clock size={16} className="text-yellow-500" />
-                    )}
-                  </div>
-                  <div className="text-gray-600">{contact.phone}</div>
-                  <div className="text-sm text-gray-500">{contact.relation}</div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {contact.verified ? (
-                      <span className="text-green-600">
-                        ✓ Verified on {new Date(contact.verifiedAt).toLocaleDateString()}
-                      </span>
-                    ) : (
-                      <span className="text-yellow-600">⏳ Pending verification</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  {/* 3. ADDED: Manual verification button for unverified contacts */}
-                  {!contact.verified && (
-                    <button 
-                      onClick={() => verifyContact(contact.id)}
-                      className="text-blue-500 p-2 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Mark as verified"
-                    >
-                      <CheckCircle size={16} />
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => window.open(`tel:${contact.phone}`, '_self')}
-                    className="text-green-500 p-2 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-                  >
-                    <Phone size={16} />
-                  </button>
-                  <button 
-                    onClick={() => removeContact(contact.id)}
-                    className="text-red-500 p-2 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          {emergencyContacts.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No emergency contacts added yet
-            </div>
-          )}
-        </div>
-
-        {/* WhatsApp Integration Status */}
-        <div className="bg-green-50 p-4 rounded-xl border border-green-200">
-          <h4 className="font-semibold text-green-800 mb-2">WhatsApp Integration</h4>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-green-700">Ready to send alerts</span>
-          </div>
-          <p className="text-xs text-green-600 mt-2">
-            Emergency alerts will be sent via WhatsApp with location, timestamp, and device status
-          </p>
-        </div>
-
-        {/* 4. ADDED: Verification Instructions */}
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-          <h4 className="font-semibold text-blue-800 mb-2">Contact Verification</h4>
-          <div className="text-sm text-blue-700 space-y-1">
-            <p>📱 When you add a contact, they'll receive a WhatsApp message explaining SafeGuard</p>
-            <p>✅ Once they confirm they received the message, tap the blue checkmark to verify them</p>
-            <p>🔔 Only verified contacts will receive emergency alerts</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 
 
@@ -1117,62 +971,98 @@ const SafeGuardApp = () => {
               </div>
             )}
             
-            <div className="space-y-3">
-              {emergencyContacts.map(contact => (
-                <div key={contact.id} className="bg-white border rounded-xl p-4 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-semibold">{contact.name}</span>
-                        {contact.verified ? (
-                          <Check size={16} className="text-green-500" />
-                        ) : (
-                          <Clock size={16} className="text-yellow-500" />
-                        )}
-                      </div>
-                      <div className="text-gray-600">{contact.phone}</div>
-                      <div className="text-sm text-gray-500">{contact.relation}</div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {contact.verified ? 'Verified' : 'Pending verification'}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button 
-                        onClick={() => window.open(`tel:${contact.phone}`, '_self')}
-                        className="text-green-500 p-2 hover:text-green-700"
-                      >
-                        <Phone size={16} />
-                      </button>
-                      <button 
-                        onClick={() => removeContact(contact.id)}
-                        className="text-red-500 p-2 hover:text-red-700"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {emergencyContacts.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No emergency contacts added yet
-                </div>
-              )}
-            </div>
 
-            {/* WhatsApp Integration Status */}
-            <div className="bg-green-50 p-4 rounded-xl border border-green-200">
-              <h4 className="font-semibold text-green-800 mb-2">WhatsApp Integration</h4>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-green-700">Ready to send alerts</span>
-              </div>
-              <p className="text-xs text-green-600 mt-2">
-                Emergency alerts will be sent via WhatsApp with location, timestamp, and device status
-              </p>
-            </div>
-          </div>
+
+
+
+
+            // Fixed emergency contacts section with proper syntax
+
+{emergencyContacts.map(contact => (
+  <div key={contact.id} className="bg-white border rounded-xl p-4 shadow-sm">
+    <div className="flex justify-between items-start">
+      <div className="flex-1">
+        <div className="flex items-center space-x-2">
+          <span className="font-semibold">{contact.name}</span>
+          {contact.verified ? (
+            <Check size={16} className="text-green-500" />
+          ) : (
+            <Clock size={16} className="text-yellow-500" />
+          )}
+        </div>
+        <div className="text-gray-600">{contact.phone}</div>
+        <div className="text-sm text-gray-500">{contact.relation}</div>
+        <div className="text-xs text-gray-400 mt-1">
+          {contact.verified ? (
+            <span className="text-green-600">
+              ✓ Verified on {new Date(contact.verifiedAt).toLocaleDateString()}
+            </span>
+          ) : (
+            <span className="text-yellow-600">⏳ Pending verification</span>
+          )}
+        </div>
+      </div>
+      <div className="flex space-x-2">
+        {!contact.verified && (
+          <button 
+            onClick={() => verifyContact(contact.id)}
+            className="text-blue-500 p-2 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Mark as verified"
+          >
+            <CheckCircle size={16} />
+          </button>
         )}
+        <button 
+          onClick={() => window.open(`tel:${contact.phone}`, '_self')}
+          className="text-green-500 p-2 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+        >
+          <Phone size={16} />
+        </button>
+        <button 
+          onClick={() => removeContact(contact.id)}
+          className="text-red-500 p-2 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  </div>
+))}
+
+{emergencyContacts.length === 0 && (
+  <div className="text-center py-8 text-gray-500">
+    <Users size={48} className="mx-auto mb-4 text-gray-300" />
+    <p>No emergency contacts yet</p>
+    <p className="text-sm">Add your first contact to get started</p>
+  </div>
+)}
+
+{/* WhatsApp Integration Status */}
+<div className="bg-green-50 p-4 rounded-xl border border-green-200">
+  <h4 className="font-semibold text-green-800 mb-2">WhatsApp Integration</h4>
+  <div className="flex items-center space-x-2">
+    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+    <span className="text-sm text-green-700">Ready to send alerts</span>
+  </div>
+  <p className="text-xs text-green-600 mt-2">
+    Emergency alerts will be sent via WhatsApp with location, timestamp, and device status
+  </p>
+</div>
+
+{/* Contact Verification Instructions */}
+<div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+  <h4 className="font-semibold text-blue-800 mb-2">Contact Verification</h4>
+  <div className="text-sm text-blue-700 space-y-1">
+    <p>📱 When you add a contact, they'll receive a WhatsApp message explaining SafeGuard</p>
+    <p>✅ Once they confirm they received the message, tap the blue checkmark to verify them</p>
+    <p>🔔 Only verified contacts will receive emergency alerts</p>
+  </div>
+</div>
+</div>
+)}
+
+
+
 
         {activeTab === 'evidence' && (
           <div className="space-y-4">
