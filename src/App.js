@@ -2,22 +2,37 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Shield, Phone, MapPin, Users, Settings, Bell, Camera, Mic, AlertTriangle, Send, Plus, X, Check, Clock, Battery, Play, Pause, Square, Download, Share2, Eye, EyeOff, Zap, Brain, Navigation } from 'lucide-react';
 
 
+
+
+
 const persistentStorage = {
-  data: {},
-  
   getItem: function(key) {
-    return this.data[key] || null;
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.warn('localStorage not available, using session storage');
+      return sessionStorage.getItem(key);
+    }
   },
   
   setItem: function(key, value) {
-    this.data[key] = value;
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      console.warn('localStorage not available, using session storage');
+      sessionStorage.setItem(key, value);
+    }
   },
   
   removeItem: function(key) {
-    delete this.data[key];
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('localStorage not available, using session storage');
+      sessionStorage.removeItem(key);
+    }
   }
 };
-
 
 
 // Initialize with default data if not exists
@@ -136,7 +151,7 @@ const SafeGuardApp = () => {
 
 
 
-  
+
 
   const watchIdRef = useRef(null);
   const timerRef = useRef(null);
