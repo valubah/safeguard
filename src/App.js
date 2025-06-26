@@ -972,12 +972,6 @@ const verifyContact = useCallback((contactId) => {
             )}
             
 
-
-
-
-
-            // Fixed emergency contacts section with proper syntax
-
 {emergencyContacts.map(contact => (
   <div key={contact.id} className="bg-white border rounded-xl p-4 shadow-sm">
     <div className="flex justify-between items-start">
