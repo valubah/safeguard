@@ -663,7 +663,7 @@ const getEmergencySessionData = useCallback((sessionId) => {
     });
   }, [emergencyContacts]);
 
-  //const triggerEmergencyAlert = useCallback((alertMessage) => {
+  const triggerEmergencyAlert2 = useCallback((alertMessage) => {
     const locationUrl = `https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}`;
     const accuracy = currentLocation.accuracy || 'Unknown';
     
@@ -679,7 +679,7 @@ const getEmergencySessionData = useCallback((sessionId) => {
         }
       });
     }
- // }, [currentLocation, batteryLevel, isOnline, sendWhatsAppMessage]);
+  }, [currentLocation, batteryLevel, isOnline, sendWhatsAppMessage]);
 
   // Real media recording
   const startRecording = useCallback(async (type = 'audio') => {
