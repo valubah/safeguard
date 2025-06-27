@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Shield, Phone, MapPin, Users, Settings, Bell, Camera, Mic, AlertTriangle, Send, Plus, X, Check, Clock, Battery, Play, Pause, Square, Download, Share2, Eye, EyeOff, Zap, Brain, Navigation, CheckCircle } from 'lucide-react';
 
-
-
-
+// Persistent storage utility
 const persistentStorage = {
   getItem: function(key) {
     try {
@@ -33,14 +31,13 @@ const persistentStorage = {
   }
 };
 
-
 // Initialize with default data if not exists
 const initializeStorage = () => {
   if (!persistentStorage.getItem('safeguard_initialized')) {
     persistentStorage.setItem('safeguard_contacts', JSON.stringify([
-      { id: 1, name: 'Mom', phone: '+1234567890', relation: 'Parent', verified: true },
-      { id: 2, name: 'Dad', phone: '+1234567891', relation: 'Parent', verified: true },
-      { id: 3, name: 'Police', phone: '911', relation: 'Emergency', verified: true }
+      { id: 1, name: 'Mom', phone: '+1234567890', relation: 'Parent', verified: true, verifiedAt: new Date('2024-01-15T10:30:00').toISOString() },
+      { id: 2, name: 'Dad', phone: '+1234567891', relation: 'Parent', verified: true, verifiedAt: new Date('2024-01-15T10:30:00').toISOString() },
+      { id: 3, name: 'Police', phone: '911', relation: 'Emergency', verified: false, verifiedAt: null }
     ]));
     persistentStorage.setItem('safeguard_recordings', JSON.stringify([]));
     persistentStorage.setItem('safeguard_location_history', JSON.stringify([]));
@@ -52,29 +49,24 @@ const initializeStorage = () => {
       autoRecord: true,
       emergencyTimeout: 10
     }));
+    persistentStorage.setItem('safeguard_contact_access', JSON.stringify({}));
+    persistentStorage.setItem('safeguard_shared_sessions', JSON.stringify([]));
     persistentStorage.setItem('safeguard_initialized', 'true');
   }
 };
 
-
-
 const SafeGuardApp = () => {
-
+  // Initialize storage on component mount
   React.useEffect(() => {
     initializeStorage();
   }, []);
 
-
-
+  // State management
   const [activeTab, setActiveTab] = useState('home');
   
   const [emergencyContacts, setEmergencyContacts] = useState(() => {
     const saved = persistentStorage.getItem('safeguard_contacts');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, name: 'Mom', phone: '+1234567890', relation: 'Parent', verified: true, verifiedAt: new Date('2024-01-15T10:30:00').toISOString() },
-      { id: 2, name: 'Dad', phone: '+1234567891', relation: 'Parent', verified: true, verifiedAt: new Date('2024-01-15T10:30:00').toISOString() },
-      { id: 3, name: 'Police', phone: '911', relation: 'Emergency', verified: false, verifiedAt: null }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [contactDataAccess, setContactDataAccess] = useState(() => {
@@ -86,10 +78,6 @@ const SafeGuardApp = () => {
     const saved = persistentStorage.getItem('safeguard_shared_sessions');
     return saved ? JSON.parse(saved) : [];
   });
-
-
-
-
 
   const [locationHistory, setLocationHistory] = useState(() => {
     const saved = persistentStorage.getItem('safeguard_location_history');
@@ -113,23 +101,10 @@ const SafeGuardApp = () => {
     };
   });
 
-
-
-
-
-
-
-
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0, accuracy: 0, timestamp: null });
-
-
-  
   const [isTracking, setIsTracking] = useState(false);
   const [panicMode, setPanicMode] = useState(false);
   const [safetyTimer, setSafetyTimer] = useState({ active: false, duration: 30, remaining: 30 });
-  
-
-
   const [isRecording, setIsRecording] = useState(false);
   const [recordingType, setRecordingType] = useState(null);
   const [mediaStream, setMediaStream] = useState(null);
@@ -137,33 +112,33 @@ const SafeGuardApp = () => {
   const [batteryLevel, setBatteryLevel] = useState(100);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [aiAnalysis, setAiAnalysis] = useState({ threat: 'low', confidence: 0, suggestions: [] });
- 
   const [newContact, setNewContact] = useState({ name: '', phone: '', relation: '' });
   const [showAddContact, setShowAddContact] = useState(false);
 
+  // Refs
+  const watchIdRef = useRef(null);
+  const timerRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
-  
-
-
+  // Persistence effects
   useEffect(() => {
     persistentStorage.setItem('safeguard_contacts', JSON.stringify(emergencyContacts));
   }, [emergencyContacts]);
 
-  // Persist location history
   useEffect(() => {
     persistentStorage.setItem('safeguard_location_history', JSON.stringify(locationHistory));
   }, [locationHistory]);
 
-  // Persist recordings
   useEffect(() => {
     persistentStorage.setItem('safeguard_recordings', JSON.stringify(recordings));
   }, [recordings]);
 
-  // Persist settings
   useEffect(() => {
     persistentStorage.setItem('safeguard_settings', JSON.stringify(settings));
   }, [settings]);
-
 
   useEffect(() => {
     persistentStorage.setItem('safeguard_contact_access', JSON.stringify(contactDataAccess));
@@ -173,197 +148,23 @@ const SafeGuardApp = () => {
     persistentStorage.setItem('safeguard_shared_sessions', JSON.stringify(sharedDataSessions));
   }, [sharedDataSessions]);
 
-
-
-
-  const watchIdRef = useRef(null);
-  const timerRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-
-
-  
-
-  // Initialize geolocation and device features
-  useEffect(() => {
-    // Check permissions and capabilities
-    if ('geolocation' in navigator) {
-      navigator.permissions.query({ name: 'geolocation' }).then(result => {
-        if (result.state === 'granted' && settings.autoStartTracking) {
-          startTracking();
-        }
-      });
-    }
-
-    // Battery API
-    if ('getBattery' in navigator) {
-      navigator.getBattery().then(battery => {
-        setBatteryLevel(Math.floor(battery.level * 100));
-        battery.addEventListener('levelchange', () => {
-          setBatteryLevel(Math.floor(battery.level * 100));
-        });
-      });
-    }
-
-    // Online/offline status
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [settings.autoStartTracking]);
-
-  // Real geolocation tracking
-  const startTracking = useCallback(() => {
-    if (!('geolocation' in navigator)) {
-      alert('Geolocation is not supported by this browser.');
-      return;
-    }
-
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    };
-
-    const success = (position) => {
-      const { latitude, longitude, accuracy } = position.coords;
-      const timestamp = new Date();
-      
-      const newLocation = {
-        lat: latitude,
-        lng: longitude,
-        accuracy: Math.round(accuracy),
-        timestamp: timestamp.toISOString()
-      };
-
-      setCurrentLocation(newLocation);
-      setLocationHistory(prev => [newLocation, ...prev.slice(0, 99)]); // Keep last 100 locations
-
-      // AI threat analysis based on location patterns
-      analyzeLocationThreat(newLocation);
-    };
-
-    const error = (err) => {
-      console.error('Geolocation error:', err);
-      alert(`Location error: ${err.message}`);
-    };
-
-    watchIdRef.current = navigator.geolocation.watchPosition(success, error, options);
-    setIsTracking(true);
-  }, []);
-
-  const stopTracking = useCallback(() => {
-    if (watchIdRef.current) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    setIsTracking(false);
-  }, []);
-
-  // AI-powered threat analysis
-  const analyzeLocationThreat = useCallback((location) => {
-    if (!settings.aiMonitoring) return;
-
-    // Simulate AI analysis (in production, call your AI service)
-    const hourOfDay = new Date().getHours();
-    const isNightTime = hourOfDay < 6 || hourOfDay > 22;
-    const speedPattern = calculateSpeed();
-    const locationPattern = analyzeLocationPattern(location);
-
-    let threat = 'low';
-    let confidence = 0.7;
-    let suggestions = [];
-
-    if (isNightTime && locationPattern.isUnfamiliar) {
-      threat = 'medium';
-      confidence = 0.8;
-      suggestions.push('Unfamiliar area at night - consider sharing location');
-    }
-
-    if (speedPattern.isStationary && locationPattern.isIsolated) {
-      threat = 'medium';
-      confidence = 0.75;
-      suggestions.push('Stationary in isolated area - enable auto-recording');
-    }
-
-    setAiAnalysis({ threat, confidence, suggestions });
-  }, [settings.aiMonitoring]);
-
-  const calculateSpeed = () => {
-    if (locationHistory.length < 2) return { speed: 0, isStationary: true };
-    
-    const recent = locationHistory[0];
-    const previous = locationHistory[1];
-    const timeDiff = (new Date(recent.timestamp) - new Date(previous.timestamp)) / 1000;
-    const distance = calculateDistance(recent.lat, recent.lng, previous.lat, previous.lng);
-    const speed = distance / timeDiff;
-
-    return { speed, isStationary: speed < 0.5 };
-  };
-
-  const analyzeLocationPattern = (location) => {
-    // Analyze if location is familiar based on history
-    const familiarLocations = locationHistory.filter(loc => 
-      calculateDistance(location.lat, location.lng, loc.lat, loc.lng) < 0.1
-    );
-
-    return {
-      isUnfamiliar: familiarLocations.length < 3,
-      isIsolated: true // Simplified - in production, use POI data
-    };
-  };
-
-  const calculateDistance = (lat1, lng1, lat2, lng2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  // Safety timer with real countdown
-  useEffect(() => {
-    if (safetyTimer.active && safetyTimer.remaining > 0) {
-      timerRef.current = setInterval(() => {
-        setSafetyTimer(prev => ({
-          ...prev,
-          remaining: prev.remaining - 1
-        }));
-      }, 1000);
-    } else if (safetyTimer.active && safetyTimer.remaining === 0) {
-      triggerEmergencyAlert('Safety timer expired - no check-in received');
-      if (settings.autoRecord) {
-        startRecording('audio');
+  // WhatsApp message sender
+  const sendWhatsAppMessage = useCallback((message) => {
+    emergencyContacts.forEach(contact => {
+      if (contact.phone !== '911') {
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = `https://wa.me/${contact.phone.replace(/[^\d]/g, '')}?text=${encodedMessage}`;
+        window.open(whatsappUrl, '_blank');
       }
-    }
+    });
+  }, [emergencyContacts]);
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [safetyTimer.active, safetyTimer.remaining, settings.autoRecord]);
-
-
-
-
-
+  // Emergency data package creation
   const generateSecureSessionId = () => {
     return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   };
   
-  const generateEmergencyAccessLink = (sessionId, data) => {
-    // In production, this would be your actual domain
+  const generateEmergencyAccessLink = (sessionId) => {
     const baseUrl = 'https://safeguardng.vercel.app';
     return `${baseUrl}/emergency-access/${sessionId}`;
   };
@@ -388,7 +189,7 @@ const SafeGuardApp = () => {
         location: rec.location,
         duration: rec.duration,
         size: rec.size,
-        downloadUrl: rec.url // In production, this would be a secure cloud URL
+        downloadUrl: rec.url
       })),
       contacts: emergencyContacts,
       userProfile: {
@@ -403,73 +204,63 @@ const SafeGuardApp = () => {
     };
   };
 
-
+  // Emergency alert trigger
   const triggerEmergencyAlert = useCallback((alertMessage) => {
     const locationUrl = `https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}`;
     
-    // Create comprehensive emergency data package
     const emergencyData = createEmergencyDataPackage();
     emergencyData.alert = alertMessage;
   
-    // Generate secure access link for emergency contacts
     const sessionId = generateSecureSessionId();
-    const accessLink = generateEmergencyAccessLink(sessionId, emergencyData);
+    const accessLink = generateEmergencyAccessLink(sessionId);
     
-    // Store emergency session data
     const emergencySession = {
       id: sessionId,
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       data: emergencyData,
       accessCount: 0,
       lastAccessed: null,
       active: true
     };
     
-    setSharedDataSessions(prev => [emergencySession, ...prev.slice(0, 9)]); // Keep last 10 sessions
+    setSharedDataSessions(prev => [emergencySession, ...prev.slice(0, 9)]);
 
+    const comprehensiveMessage = `🚨 EMERGENCY ALERT 🚨
 
+${alertMessage}
 
+📍 LIVE LOCATION: ${locationUrl}
+⏰ Time: ${new Date().toLocaleString()}
+🎯 Accuracy: ${currentLocation.accuracy || 'Unknown'}m
+🔋 Battery: ${batteryLevel}%
+📶 Network: ${isOnline ? 'Online' : 'Offline'}
 
-     // Enhanced emergency message with full data access
-  const comprehensiveMessage = `🚨 EMERGENCY ALERT 🚨
+🔗 FULL DATA ACCESS:
+${accessLink}
 
-  ${alertMessage}
+This secure link provides access to:
+• Real-time location tracking
+• Location history (last 20 locations)
+• Audio/video recordings
+• Photos taken
+• Medical information
+• Emergency contact details
+• Device status
+
+⚠️ Link expires in 24 hours
+⚠️ This is an automated safety alert from SafeGuard app.
+
+IMMEDIATE ACTIONS RECOMMENDED:
+1. Click the link above to access all data
+2. Contact local emergency services if needed
+3. Share this information with other emergency contacts
+4. Call ${emergencyContacts.find(c => c.relation === 'Emergency')?.phone || '911'} for immediate help`;
   
-  📍 LIVE LOCATION: ${locationUrl}
-  ⏰ Time: ${new Date().toLocaleString()}
-  🎯 Accuracy: ${currentLocation.accuracy || 'Unknown'}m
-  🔋 Battery: ${batteryLevel}%
-  📶 Network: ${isOnline ? 'Online' : 'Offline'}
-  
-  🔗 FULL DATA ACCESS:
-  ${accessLink}
-  
-  This secure link provides access to:
-  • Real-time location tracking
-  • Location history (last 20 locations)
-  • Audio/video recordings
-  • Photos taken
-  • Medical information
-  • Emergency contact details
-  • Device status
-  
-  ⚠️ Link expires in 24 hours
-  ⚠️ This is an automated safety alert from SafeGuard app.
-  
-  IMMEDIATE ACTIONS RECOMMENDED:
-  1. Click the link above to access all data
-  2. Contact local emergency services if needed
-  3. Share this information with other emergency contacts
-  4. Call ${emergencyContacts.find(c => c.relation === 'Emergency')?.phone || '911'} for immediate help`;
-  
-    // Send to all emergency contacts
     sendWhatsAppMessage(comprehensiveMessage);
   
-    // Also create a simplified SMS version for fallback
     const smsMessage = `🚨 EMERGENCY: ${alertMessage}\nLocation: ${locationUrl}\nTime: ${new Date().toLocaleString()}\nFull data: ${accessLink}\nCall 911 if needed!`;
     
-    // Send SMS if available
     if ('sms' in navigator) {
       emergencyContacts.forEach(contact => {
         if (contact.phone !== '911') {
@@ -478,7 +269,6 @@ const SafeGuardApp = () => {
       });
     }
   
-    // Store this emergency event
     const emergencyEvent = {
       id: Date.now(),
       type: 'emergency_alert',
@@ -490,198 +280,201 @@ const SafeGuardApp = () => {
       dataShared: true
     };
 
+    setRecordings(prev => [emergencyEvent, ...prev]);
+  }, [currentLocation, batteryLevel, isOnline, emergencyContacts, sendWhatsAppMessage, locationHistory, recordings, settings, aiAnalysis, createEmergencyDataPackage]);
 
-     // Add to recordings/events history
-  setRecordings(prev => [emergencyEvent, ...prev]);
+  // Initialize geolocation and device features
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' }).then(result => {
+        if (result.state === 'granted' && settings.autoStartTracking) {
+          startTracking();
+        }
+      });
+    }
 
-}, [currentLocation, batteryLevel, isOnline, emergencyContacts, sendWhatsAppMessage, locationHistory, recordings, settings, aiAnalysis]);
+    if ('getBattery' in navigator) {
+      navigator.getBattery().then(battery => {
+        setBatteryLevel(Math.floor(battery.level * 100));
+        battery.addEventListener('levelchange', () => {
+          setBatteryLevel(Math.floor(battery.level * 100));
+        });
+      });
+    }
 
-// Enhanced contact management with data access permissions
-const addEmergencyContact = useCallback(() => {
-  if (!newContact.name || !newContact.phone) {
-    alert('Please fill in all fields');
-    return;
-  }
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-  const contact = {
-    id: Date.now(),
-    ...newContact,
-    verified: false,
-    verifiedAt: null,
-    dataAccessLevel: 'full', // full, limited, emergency-only
-    permissions: {
-      realTimeLocation: true,
-      locationHistory: true,
-      recordings: true,
-      medicalInfo: true,
-      deviceStatus: true,
-      emergencyAlerts: true
-    },
-    lastDataAccess: null,
-    totalDataAccesses: 0
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [settings.autoStartTracking]);
+
+  // Geolocation tracking
+  const startTracking = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      alert('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    };
+
+    const success = (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const timestamp = new Date();
+      
+      const newLocation = {
+        lat: latitude,
+        lng: longitude,
+        accuracy: Math.round(accuracy),
+        timestamp: timestamp.toISOString()
+      };
+
+      setCurrentLocation(newLocation);
+      setLocationHistory(prev => [newLocation, ...prev.slice(0, 99)]);
+
+      analyzeLocationThreat(newLocation);
+    };
+
+    const error = (err) => {
+      console.error('Geolocation error:', err);
+      alert(`Location error: ${err.message}`);
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(success, error, options);
+    setIsTracking(true);
+  }, []);
+
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+  }, []);
+
+  // AI threat analysis
+  const analyzeLocationThreat = useCallback((location) => {
+    if (!settings.aiMonitoring) return;
+
+    const hourOfDay = new Date().getHours();
+    const isNightTime = hourOfDay < 6 || hourOfDay > 22;
+    const speedPattern = calculateSpeed();
+    const locationPattern = analyzeLocationPattern(location);
+
+    let threat = 'low';
+    let confidence = 0.7;
+    let suggestions = [];
+
+    if (isNightTime && locationPattern.isUnfamiliar) {
+      threat = 'medium';
+      confidence = 0.8;
+      suggestions.push('Unfamiliar area at night - consider sharing location');
+    }
+
+    if (speedPattern.isStationary && locationPattern.isIsolated) {
+      threat = 'medium';
+      confidence = 0.75;
+      suggestions.push('Stationary in isolated area - enable auto-recording');
+    }
+
+    setAiAnalysis({ threat, confidence, suggestions });
+  }, [settings.aiMonitoring, locationHistory]);
+
+  const calculateSpeed = () => {
+    if (locationHistory.length < 2) return { speed: 0, isStationary: true };
+    
+    const recent = locationHistory[0];
+    const previous = locationHistory[1];
+    const timeDiff = (new Date(recent.timestamp) - new Date(previous.timestamp)) / 1000;
+    const distance = calculateDistance(recent.lat, recent.lng, previous.lat, previous.lng);
+    const speed = distance / timeDiff;
+
+    return { speed, isStationary: speed < 0.5 };
   };
 
-  setEmergencyContacts(prev => [...prev, contact]);
-  setContactDataAccess(prev => ({
-    ...prev,
-    [contact.id]: {
-      granted: true,
-      grantedAt: new Date().toISOString(),
-      level: 'full'
+  const analyzeLocationPattern = (location) => {
+    const familiarLocations = locationHistory.filter(loc => 
+      calculateDistance(location.lat, location.lng, loc.lat, loc.lng) < 0.1
+    );
+
+    return {
+      isUnfamiliar: familiarLocations.length < 3,
+      isIsolated: true
+    };
+  };
+
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Safety timer
+  useEffect(() => {
+    if (safetyTimer.active && safetyTimer.remaining > 0) {
+      timerRef.current = setInterval(() => {
+        setSafetyTimer(prev => ({
+          ...prev,
+          remaining: prev.remaining - 1
+        }));
+      }, 1000);
+    } else if (safetyTimer.active && safetyTimer.remaining === 0) {
+      triggerEmergencyAlert('Safety timer expired - no check-in received');
+      if (settings.autoRecord) {
+        startRecording('audio');
+      }
     }
-  }));
-  
-  setNewContact({ name: '', phone: '', relation: '' });
-  setShowAddContact(false);
 
-  // Enhanced verification message with data access explanation
-  const verifyMessage = `Hi ${contact.name}! 
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [safetyTimer.active, safetyTimer.remaining, settings.autoRecord, triggerEmergencyAlert]);
 
-You've been added as an emergency contact for SafeGuard personal safety app.
-
-🔐 DATA ACCESS GRANTED:
-In case of emergency, you will receive a secure link with access to:
-• Live location tracking
-• Location history
-• Audio/video recordings 
-• Photos
-• Medical information
-• Device battery & status
-
-🚨 EMERGENCY ALERTS:
-You'll receive WhatsApp messages with:
-• Immediate location data
-• Emergency situation details
-• Secure access to all safety data
-• Recommended actions
-
-Please confirm you received this message and understand your emergency contact responsibilities.
-
-This access is only activated during genuine emergencies.`;
-
-  const whatsappUrl = `https://wa.me/${contact.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(verifyMessage)}`;
-  window.open(whatsappUrl, '_blank');
-}, [newContact]);
-
-// Function to revoke emergency data access
-const revokeContactAccess = useCallback((contactId) => {
-  setContactDataAccess(prev => ({
-    ...prev,
-    [contactId]: {
-      ...prev[contactId],
-      granted: false,
-      revokedAt: new Date().toISOString()
-    }
-  }));
-
-  // Deactivate any active sessions for this contact
-  setSharedDataSessions(prev => 
-    prev.map(session => ({
-      ...session,
-      active: session.contactId === contactId ? false : session.active
-    }))
-  );
-}, []);
-
-// Function to grant specific data access levels
-const updateContactPermissions = useCallback((contactId, permissions) => {
-  setEmergencyContacts(prev => 
-    prev.map(contact => 
-      contact.id === contactId 
-        ? { ...contact, permissions: { ...contact.permissions, ...permissions } }
-        : contact
-    )
-  );
-}, []);
-
-// Function to get emergency data for a specific session
-const getEmergencySessionData = useCallback((sessionId) => {
-  const session = sharedDataSessions.find(s => s.id === sessionId && s.active);
-  if (!session || new Date() > new Date(session.expiresAt)) {
-    return null;
-  }
-
-  // Update access count
-  setSharedDataSessions(prev =>
-    prev.map(s => 
-      s.id === sessionId 
-        ? { ...s, accessCount: s.accessCount + 1, lastAccessed: new Date().toISOString() }
-        : s
-    )
-  );
-
-  return session.data;
-}, [sharedDataSessions]);
-
-
-
-  
-
-
-  // Real panic button with immediate response
+  // Panic button
   const triggerPanic = useCallback(() => {
     setPanicMode(true);
     if (!isTracking) startTracking();
     
-    // Immediate emergency alert
     triggerEmergencyAlert('🚨 PANIC BUTTON ACTIVATED - IMMEDIATE HELP NEEDED 🚨');
     
-    // Start recording immediately
     if (settings.autoRecord) {
       startRecording('video');
     }
 
-    // Vibrate if available
     if ('vibrate' in navigator) {
       navigator.vibrate([200, 100, 200, 100, 200]);
     }
 
-    // Flash screen
     document.body.style.backgroundColor = '#ef4444';
     setTimeout(() => {
       document.body.style.backgroundColor = '';
     }, 1000);
-  }, [isTracking, settings.autoRecord]);
+  }, [isTracking, settings.autoRecord, startTracking, triggerEmergencyAlert]);
 
   const cancelPanic = useCallback(() => {
     setPanicMode(false);
     stopRecording();
     
-    // Send cancellation message
     const message = `✅ PANIC ALERT CANCELLED\n\nFalse alarm - I am safe.\nTime: ${new Date().toLocaleString()}\nLocation: https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}`;
     sendWhatsAppMessage(message);
-  }, [currentLocation]);
+  }, [currentLocation, sendWhatsAppMessage]);
 
-  // Real WhatsApp integration
-  const sendWhatsAppMessage = useCallback((message) => {
-    emergencyContacts.forEach(contact => {
-      if (contact.phone !== '911') {
-        const encodedMessage = encodeURIComponent(message);
-        const whatsappUrl = `https://wa.me/${contact.phone.replace(/[^\d]/g, '')}?text=${encodedMessage}`;
-        window.open(whatsappUrl, '_blank');
-      }
-    });
-  }, [emergencyContacts]);
-
-  const triggerEmergencyAlert2 = useCallback((alertMessage) => {
-    const locationUrl = `https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}`;
-    const accuracy = currentLocation.accuracy || 'Unknown';
-    
-    const message = `🚨 EMERGENCY ALERT 🚨\n\n${alertMessage}\n\n📍 Location: ${locationUrl}\n⏰ Time: ${new Date().toLocaleString()}\n🎯 Accuracy: ${accuracy}m\n🔋 Battery: ${batteryLevel}%\n📶 Network: ${isOnline ? 'Online' : 'Offline'}\n\n⚠️ This is an automated safety alert from SafeGuard app.`;
-    
-    sendWhatsAppMessage(message);
-
-    // Also try to send SMS if available
-    if ('sms' in navigator) {
-      emergencyContacts.forEach(contact => {
-        if (contact.phone !== '911') {
-          navigator.sms.send(contact.phone, message);
-        }
-      });
-    }
-  }, [currentLocation, batteryLevel, isOnline, sendWhatsAppMessage]);
-
-  // Real media recording
+  // Media recording
   const startRecording = useCallback(async (type = 'audio') => {
     try {
       let stream;
@@ -726,9 +519,6 @@ const getEmergencySessionData = useCallback((sessionId) => {
         };
 
         setRecordings(prev => [newRecording, ...prev]);
-        
-        // Auto-upload to cloud storage in production
-        // uploadToCloud(newRecording);
       };
 
       recorder.startTime = Date.now();
@@ -757,7 +547,7 @@ const getEmergencySessionData = useCallback((sessionId) => {
     setMediaRecorder(null);
   }, [mediaStream]);
 
-  // Take photo
+  // Photo capture
   const takePhoto = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -768,7 +558,6 @@ const getEmergencySessionData = useCallback((sessionId) => {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
         
-        // Capture after a short delay
         setTimeout(() => {
           const canvas = canvasRef.current;
           const video = videoRef.current;
@@ -793,7 +582,6 @@ const getEmergencySessionData = useCallback((sessionId) => {
             setRecordings(prev => [photo, ...prev]);
           }, 'image/jpeg', 0.8);
           
-          // Stop the stream
           stream.getTracks().forEach(track => track.stop());
         }, 1000);
       }
@@ -819,7 +607,7 @@ const getEmergencySessionData = useCallback((sessionId) => {
   }, [currentLocation, batteryLevel, sendWhatsAppMessage]);
 
   // Contact management
- // const addEmergencyContact = useCallback(() => {
+  const addEmergencyContact = useCallback(() => {
     if (!newContact.name || !newContact.phone) {
       alert('Please fill in all fields');
       return;
@@ -829,45 +617,76 @@ const getEmergencySessionData = useCallback((sessionId) => {
       id: Date.now(),
       ...newContact,
       verified: false,
-      verifiedAt: null // Added verification date field
+      verifiedAt: null,
+      dataAccessLevel: 'full',
+      permissions: {
+        realTimeLocation: true,
+        locationHistory: true,
+        recordings: true,
+        medicalInfo: true,
+        deviceStatus: true,
+        emergencyAlerts: true
+      },
+      lastDataAccess: null,
+      totalDataAccesses: 0
     };
 
     setEmergencyContacts(prev => [...prev, contact]);
+    setContactDataAccess(prev => ({
+      ...prev,
+      [contact.id]: {
+        granted: true,
+        grantedAt: new Date().toISOString(),
+        level: 'full'
+      }
+    }));
+    
     setNewContact({ name: '', phone: '', relation: '' });
     setShowAddContact(false);
 
-    // Send verification message
-    const verifyMessage = `Hi ${contact.name}! You've been added as an emergency contact for SafeGuard personal safety app.\n\nThis app will send you emergency alerts with location data if needed.\n\nPlease confirm you received this message by tapping "Verify Contact" in the app settings.`;
+    const verifyMessage = `Hi ${contact.name}! 
+
+You've been added as an emergency contact for SafeGuard personal safety app.
+
+🔐 DATA ACCESS GRANTED:
+In case of emergency, you will receive a secure link with access to:
+• Live location tracking
+• Location history
+• Audio/video recordings 
+• Photos
+• Medical information
+• Device battery & status
+
+🚨 EMERGENCY ALERTS:
+You'll receive WhatsApp messages with:
+• Immediate location data
+• Emergency situation details
+• Secure access to all safety data
+• Recommended actions
+
+Please confirm you received this message and understand your emergency contact responsibilities.
+
+This access is only activated during genuine emergencies.`;
+
     const whatsappUrl = `https://wa.me/${contact.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(verifyMessage)}`;
     window.open(whatsappUrl, '_blank');
- // }, [newContact]);
+  }, [newContact]);
 
-
-
-  // STEP 2: ADD THIS NEW FUNCTION
-const verifyContact = useCallback((contactId) => {
-  setEmergencyContacts(prev => prev.map(contact => 
-    contact.id === contactId 
-      ? { 
-          ...contact, 
-          verified: true, 
-          verifiedAt: new Date().toISOString() 
-        }
-      : contact
-  ));
-}, []);
-
-
-
-
+  const verifyContact = useCallback((contactId) => {
+    setEmergencyContacts(prev => prev.map(contact => 
+      contact.id === contactId 
+        ? { 
+            ...contact, 
+            verified: true, 
+            verifiedAt: new Date().toISOString() 
+          }
+        : contact
+    ));
+  }, []);
 
   const removeContact = useCallback((id) => {
     setEmergencyContacts(prev => prev.filter(contact => contact.id !== id));
   }, []);
-
-
-
-
 
   // Share recording
   const shareRecording = useCallback(async (recording) => {
@@ -884,7 +703,6 @@ const verifyContact = useCallback((contactId) => {
         });
       } catch (error) {
         console.error('Error sharing:', error);
-        // Fallback to WhatsApp
         const message = `🚨 SafeGuard Evidence\n\nRecorded: ${new Date(recording.timestamp).toLocaleString()}\nLocation: https://maps.google.com/?q=${recording.location.lat},${recording.location.lng}\nType: ${recording.type}\nSize: ${(recording.size / 1024 / 1024).toFixed(2)}MB`;
         sendWhatsAppMessage(message);
       }
@@ -1253,92 +1071,88 @@ const verifyContact = useCallback((contactId) => {
               </div>
             )}
             
+            {emergencyContacts.map(contact => (
+              <div key={contact.id} className="bg-white border rounded-xl p-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold">{contact.name}</span>
+                      {contact.verified ? (
+                        <Check size={16} className="text-green-500" />
+                      ) : (
+                        <Clock size={16} className="text-yellow-500" />
+                      )}
+                    </div>
+                    <div className="text-gray-600">{contact.phone}</div>
+                    <div className="text-sm text-gray-500">{contact.relation}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {contact.verified ? (
+                        <span className="text-green-600">
+                          ✓ Verified on {new Date(contact.verifiedAt).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-yellow-600">⏳ Pending verification</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    {!contact.verified && (
+                      <button 
+                        onClick={() => verifyContact(contact.id)}
+                        className="text-blue-500 p-2 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Mark as verified"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => window.open(`tel:${contact.phone}`, '_self')}
+                      className="text-green-500 p-2 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                    >
+                      <Phone size={16} />
+                    </button>
+                    <button 
+                      onClick={() => removeContact(contact.id)}
+                      className="text-red-500 p-2 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-{emergencyContacts.map(contact => (
-  <div key={contact.id} className="bg-white border rounded-xl p-4 shadow-sm">
-    <div className="flex justify-between items-start">
-      <div className="flex-1">
-        <div className="flex items-center space-x-2">
-          <span className="font-semibold">{contact.name}</span>
-          {contact.verified ? (
-            <Check size={16} className="text-green-500" />
-          ) : (
-            <Clock size={16} className="text-yellow-500" />
-          )}
-        </div>
-        <div className="text-gray-600">{contact.phone}</div>
-        <div className="text-sm text-gray-500">{contact.relation}</div>
-        <div className="text-xs text-gray-400 mt-1">
-          {contact.verified ? (
-            <span className="text-green-600">
-              ✓ Verified on {new Date(contact.verifiedAt).toLocaleDateString()}
-            </span>
-          ) : (
-            <span className="text-yellow-600">⏳ Pending verification</span>
-          )}
-        </div>
-      </div>
-      <div className="flex space-x-2">
-        {!contact.verified && (
-          <button 
-            onClick={() => verifyContact(contact.id)}
-            className="text-blue-500 p-2 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Mark as verified"
-          >
-            <CheckCircle size={16} />
-          </button>
+            {emergencyContacts.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Users size={48} className="mx-auto mb-4 text-gray-300" />
+                <p>No emergency contacts yet</p>
+                <p className="text-sm">Add your first contact to get started</p>
+              </div>
+            )}
+
+            {/* WhatsApp Integration Status */}
+            <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+              <h4 className="font-semibold text-green-800 mb-2">WhatsApp Integration</h4>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-green-700">Ready to send alerts</span>
+              </div>
+              <p className="text-xs text-green-600 mt-2">
+                Emergency alerts will be sent via WhatsApp with location, timestamp, and device status
+              </p>
+            </div>
+
+            {/* Contact Verification Instructions */}
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <h4 className="font-semibold text-blue-800 mb-2">Contact Verification</h4>
+              <div className="text-sm text-blue-700 space-y-1">
+                <p>📱 When you add a contact, they'll receive a WhatsApp message explaining SafeGuard</p>
+                <p>✅ Once they confirm they received the message, tap the blue checkmark to verify them</p>
+                <p>🔔 Only verified contacts will receive emergency alerts</p>
+              </div>
+            </div>
+          </div>
         )}
-        <button 
-          onClick={() => window.open(`tel:${contact.phone}`, '_self')}
-          className="text-green-500 p-2 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-        >
-          <Phone size={16} />
-        </button>
-        <button 
-          onClick={() => removeContact(contact.id)}
-          className="text-red-500 p-2 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  </div>
-))}
-
-{emergencyContacts.length === 0 && (
-  <div className="text-center py-8 text-gray-500">
-    <Users size={48} className="mx-auto mb-4 text-gray-300" />
-    <p>No emergency contacts yet</p>
-    <p className="text-sm">Add your first contact to get started</p>
-  </div>
-)}
-
-{/* WhatsApp Integration Status */}
-<div className="bg-green-50 p-4 rounded-xl border border-green-200">
-  <h4 className="font-semibold text-green-800 mb-2">WhatsApp Integration</h4>
-  <div className="flex items-center space-x-2">
-    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-    <span className="text-sm text-green-700">Ready to send alerts</span>
-  </div>
-  <p className="text-xs text-green-600 mt-2">
-    Emergency alerts will be sent via WhatsApp with location, timestamp, and device status
-  </p>
-</div>
-
-{/* Contact Verification Instructions */}
-<div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-  <h4 className="font-semibold text-blue-800 mb-2">Contact Verification</h4>
-  <div className="text-sm text-blue-700 space-y-1">
-    <p>📱 When you add a contact, they'll receive a WhatsApp message explaining SafeGuard</p>
-    <p>✅ Once they confirm they received the message, tap the blue checkmark to verify them</p>
-    <p>🔔 Only verified contacts will receive emergency alerts</p>
-  </div>
-</div>
-</div>
-)}
-
-
-
 
         {activeTab === 'evidence' && (
           <div className="space-y-4">
@@ -1446,7 +1260,7 @@ const verifyContact = useCallback((contactId) => {
                             {recording.type === 'photo' ? '📷' : recording.type === 'video' ? '🎥' : '🎵'} 
                             {recording.type.charAt(0).toUpperCase() + recording.type.slice(1)}
                           </span>
-                          {recording.type !== 'photo' && (
+                          {recording.type !== 'photo' && recording.duration && (
                             <span className="text-xs bg-gray-100 px-2 py-1 rounded">
                               {recording.duration}s
                             </span>
@@ -1455,15 +1269,19 @@ const verifyContact = useCallback((contactId) => {
                         <div className="text-sm text-gray-600">
                           {new Date(recording.timestamp).toLocaleString()}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          📍 {recording.location.lat.toFixed(4)}, {recording.location.lng.toFixed(4)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          💾 {formatFileSize(recording.size)}
-                        </div>
+                        {recording.location && (
+                          <div className="text-xs text-gray-500">
+                            📍 {recording.location.lat?.toFixed(4)}, {recording.location.lng?.toFixed(4)}
+                          </div>
+                        )}
+                        {recording.size && (
+                          <div className="text-xs text-gray-500">
+                            💾 {formatFileSize(recording.size)}
+                          </div>
+                        )}
                       </div>
                       <div className="flex space-x-1">
-                        {recording.type !== 'photo' && (
+                        {recording.type !== 'photo' && recording.url && (
                           <button 
                             onClick={() => {
                               const audio = new Audio(recording.url);
@@ -1474,7 +1292,7 @@ const verifyContact = useCallback((contactId) => {
                             <Play size={14} />
                           </button>
                         )}
-                        {recording.type === 'photo' && (
+                        {recording.type === 'photo' && recording.url && (
                           <button 
                             onClick={() => window.open(recording.url, '_blank')}
                             className="text-blue-500 text-sm p-2 hover:text-blue-700"
